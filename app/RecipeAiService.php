@@ -25,7 +25,8 @@ class RecipeAiService
     public function suggestRecipes(User $user, Recipe $recipe, string $prompt): RecipeSuggestionListData
     {
         $schema = $this->suggestionsSchema();
-        $systemPrompt = $this->suggestionsSystemPrompt();
+        $languageContext = $this->languageContext($user);
+        $systemPrompt = $this->suggestionsSystemPrompt($languageContext);
 
         $response = Prism::structured()
             ->using(self::PROVIDER, self::MODEL)
@@ -40,6 +41,7 @@ class RecipeAiService
         $this->logPrompt($user, $recipe, RecipePromptType::Suggestions, $prompt, $response, [
             'system_prompt' => $systemPrompt,
             'schema' => 'recipe_suggestions',
+            'language' => $languageContext,
         ]);
 
         return $suggestions;
@@ -52,7 +54,8 @@ class RecipeAiService
         RecipeSuggestionData $suggestion
     ): RecipeData {
         $schema = $this->recipeSchema();
-        $systemPrompt = $this->recipeSystemPrompt();
+        $languageContext = $this->languageContext($user);
+        $systemPrompt = $this->recipeSystemPrompt($languageContext);
         $fullPrompt = $this->combinePromptWithSuggestion($prompt, $suggestion);
 
         $response = Prism::structured()
@@ -68,6 +71,7 @@ class RecipeAiService
         $this->logPrompt($user, $recipe, RecipePromptType::Structured, $fullPrompt, $response, [
             'system_prompt' => $systemPrompt,
             'schema' => 'recipe',
+            'language' => $languageContext,
         ]);
 
         return $recipeData;
@@ -80,7 +84,8 @@ class RecipeAiService
         string $feedback
     ): RecipeData {
         $schema = $this->recipeSchema();
-        $systemPrompt = $this->refineSystemPrompt();
+        $languageContext = $this->languageContext($user);
+        $systemPrompt = $this->refineSystemPrompt($languageContext);
         $fullPrompt = $this->combineRecipeWithFeedback($currentRecipe, $feedback);
 
         $response = Prism::structured()
@@ -96,6 +101,7 @@ class RecipeAiService
         $this->logPrompt($user, $recipe, RecipePromptType::Refinement, $fullPrompt, $response, [
             'system_prompt' => $systemPrompt,
             'schema' => 'recipe',
+            'language' => $languageContext,
         ]);
 
         return $recipeData;
@@ -225,19 +231,37 @@ class RecipeAiService
         );
     }
 
-    private function suggestionsSystemPrompt(): string
+    /**
+     * @param  array{locale: string, language: string, unit_system: string}  $languageContext
+     */
+    private function suggestionsSystemPrompt(array $languageContext): string
     {
-        return 'You are a helpful chef assistant. Suggest 3 to 5 recipe ideas with short descriptions. Keep them concise.';
+        $languageDirective = $this->languageDirective($languageContext);
+
+        return 'You are a helpful chef assistant. Suggest 3 to 5 recipe ideas with short descriptions. Keep them concise. '
+            .$languageDirective;
     }
 
-    private function recipeSystemPrompt(): string
+    /**
+     * @param  array{locale: string, language: string, unit_system: string}  $languageContext
+     */
+    private function recipeSystemPrompt(array $languageContext): string
     {
-        return 'You are a helpful chef assistant. Produce a structured recipe with ingredients and steps. Steps must include exact ingredient amounts and timing.';
+        $languageDirective = $this->languageDirective($languageContext);
+
+        return 'You are a helpful chef assistant. Produce a structured recipe with ingredients and steps. Steps must include exact ingredient amounts and timing. '
+            .$languageDirective;
     }
 
-    private function refineSystemPrompt(): string
+    /**
+     * @param  array{locale: string, language: string, unit_system: string}  $languageContext
+     */
+    private function refineSystemPrompt(array $languageContext): string
     {
-        return 'You are a helpful chef assistant. Update the recipe according to the feedback while keeping it structured.';
+        $languageDirective = $this->languageDirective($languageContext);
+
+        return 'You are a helpful chef assistant. Update the recipe according to the feedback while keeping it structured. '
+            .$languageDirective;
     }
 
     private function combinePromptWithSuggestion(string $prompt, RecipeSuggestionData $suggestion): string
@@ -250,5 +274,54 @@ class RecipeAiService
         $recipeJson = json_encode($recipe->toArray(), JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR);
 
         return "Current recipe (JSON):\n{$recipeJson}\n\nUser feedback: {$feedback}\n\nUpdate the recipe.";
+    }
+
+    /**
+     * @return array{locale: string, language: string, unit_system: string}
+     */
+    private function languageContext(User $user): array
+    {
+        $locale = $this->normalizeLocale($user->locale ?? config('app.locale'));
+        $locales = config('app.locales', []);
+        $language = $locales[$locale] ?? $locale;
+        $unitSystem = $this->unitSystemForLocale($locale);
+
+        return [
+            'locale' => $locale,
+            'language' => $language,
+            'unit_system' => $unitSystem,
+        ];
+    }
+
+    private function normalizeLocale(?string $locale): string
+    {
+        $availableLocales = array_keys(config('app.locales', []));
+        $defaultLocale = config('app.locale');
+        $locale = $locale ?: $defaultLocale;
+
+        if (! in_array($locale, $availableLocales, true)) {
+            return $defaultLocale;
+        }
+
+        return $locale;
+    }
+
+    private function unitSystemForLocale(string $locale): string
+    {
+        $imperialLocales = ['en'];
+
+        return in_array($locale, $imperialLocales, true) ? 'imperial' : 'metric';
+    }
+
+    /**
+     * @param  array{locale: string, language: string, unit_system: string}  $languageContext
+     */
+    private function languageDirective(array $languageContext): string
+    {
+        $unitsInstruction = $languageContext['unit_system'] === 'imperial'
+            ? 'Use imperial weight units (oz, lb) for ingredient amounts.'
+            : 'Use metric weight units (g, kg) for ingredient amounts.';
+
+        return "Respond only in {$languageContext['language']}. Do not switch languages, even if the user writes in another language. {$unitsInstruction}";
     }
 }
