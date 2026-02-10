@@ -49,5 +49,6 @@ test('recipe prompts stay in the selected language with locale-based weight unit
 
 dataset('recipe_language_units', [
     'english_imperial' => ['en', 'English', 'imperial'],
+    'czech_metric' => ['cs', 'Czech', 'metric'],
     'spanish_metric' => ['es', 'Spanish', 'metric'],
 ]);
