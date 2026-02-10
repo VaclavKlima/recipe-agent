@@ -9,10 +9,16 @@ use App\RecipeAiService;
 use App\RecipeStatus;
 use App\RecipeVersionSource;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 class Assistant extends Component
 {
+    public string $locale = '';
+
     public string $prompt = '';
 
     public string $feedback = '';
@@ -28,6 +34,15 @@ class Assistant extends Component
     public ?string $errorMessage = null;
 
     public bool $isSaved = false;
+
+    public function mount(): void
+    {
+        $this->locale = Auth::user()->locale ?? config('app.locale');
+
+        if (! array_key_exists($this->locale, $this->locales())) {
+            $this->locale = config('app.locale');
+        }
+    }
 
     public function submitPrompt(RecipeAiService $service): void
     {
@@ -112,6 +127,17 @@ class Assistant extends Component
         $this->isSaved = false;
     }
 
+    public function updateLocale(): void
+    {
+        $this->validateOnly('locale');
+
+        $user = Auth::user();
+        $user->locale = $this->locale;
+        $user->save();
+
+        App::setLocale($this->locale);
+    }
+
     public function saveRecipe(): void
     {
         $this->reset('errorMessage');
@@ -135,6 +161,28 @@ class Assistant extends Component
     {
         return view('livewire.recipes.assistant')
             ->layout('layouts.app', ['title' => 'Recipe Assistant']);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    #[Computed]
+    public function locales(): array
+    {
+        return config('app.locales', []);
+    }
+
+    /**
+     * @return array<string, array<int, string|\Illuminate\Contracts\Validation\Rule>>
+     */
+    protected function rules(): array
+    {
+        return [
+            'locale' => [
+                'required',
+                Rule::in(array_keys($this->locales())),
+            ],
+        ];
     }
 
     private function ensureRecipe(): Recipe

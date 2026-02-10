@@ -20,6 +20,16 @@
 
         <div class="mt-6 grid gap-4">
             <flux:field>
+                <flux:label>Recipe language</flux:label>
+                <flux:select wire:model.live="locale" placeholder="Select a language" wire:change="updateLocale">
+                    @foreach ($this->locales as $value => $label)
+                        <flux:select.option value="{{ $value }}">{{ $label }}</flux:select.option>
+                    @endforeach
+                </flux:select>
+                <flux:error name="locale" />
+            </flux:field>
+
+            <flux:field>
                 <flux:label>Recipe prompt</flux:label>
                 <flux:textarea wire:model.live="prompt" rows="3" placeholder="e.g. quick chicken dinner with vegetables"></flux:textarea>
                 <flux:error name="prompt" />
