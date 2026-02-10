@@ -13,5 +13,7 @@
                 </flux:button>
             </div>
         </div>
+
+        <livewire:recipes.saved-list />
     </div>
 </x-layouts::app>

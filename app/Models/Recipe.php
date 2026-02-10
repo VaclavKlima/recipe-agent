@@ -26,6 +26,7 @@ class Recipe extends Model
         'servings',
         'current_version_id',
         'saved_at',
+        'is_starred',
     ];
 
     /**
@@ -35,6 +36,7 @@ class Recipe extends Model
     {
         return [
             'saved_at' => 'datetime',
+            'is_starred' => 'boolean',
             'status' => RecipeStatus::class,
         ];
     }
