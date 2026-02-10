@@ -6,6 +6,15 @@
                 "C:\\Users\\Dragan\\Herd\\recipe-agent\\artisan",
                 "boost:mcp"
             ]
+        },
+        "herd": {
+            "command": "C:\\Users\\Dragan\\.config\\herd\\bin\\php84\\php.exe",
+            "args": [
+                "C:/Users/Dragan/.config/herd/bin/herd-mcp.phar"
+            ],
+            "env": {
+                "SITE_PATH": "C:\\Users\\Dragan\\Herd\\recipe-agent"
+            }
         }
     }
 }
